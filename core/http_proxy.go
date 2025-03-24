@@ -656,10 +656,10 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						req.URL.RawQuery = qs.Encode()
 
 						// force get
-						for _, fp := range pl.forcePost {
-							if fp.tp == "get" {
+						for _, fp := range pl.forceGet {
+							if fp.tp == "query" {
 								if fp.path.MatchString(req.URL.Path) {
-									log.Debug("force_post: url matched: %s", req.URL.Path)
+									log.Debug("force_get: url matched: %s", req.URL.Path)
 									ok_search := false
 									if len(fp.search) > 0 {
 										k_matched := len(fp.search)
