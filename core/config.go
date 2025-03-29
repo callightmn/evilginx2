@@ -293,6 +293,7 @@ func (c *Config) SetHttpsPort(port int) {
 	c.general.HttpsPort = port
 	c.cfg.Set(CFG_GENERAL, c.general)
 	log.Info("https port set to: %d", port)
+	log.Warning("you may need to restart evilginx for the changes to take effect")
 	c.cfg.WriteConfig()
 }
 
@@ -300,6 +301,7 @@ func (c *Config) SetDnsPort(port int) {
 	c.general.DnsPort = port
 	c.cfg.Set(CFG_GENERAL, c.general)
 	log.Info("dns port set to: %d", port)
+	log.Warning("you may need to restart evilginx for the changes to take effect")
 	c.cfg.WriteConfig()
 }
 
