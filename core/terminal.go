@@ -250,6 +250,25 @@ func (t *Terminal) handleConfig(args []string) error {
 				t.cfg.SetServerBindIP(args[2])
 				return nil
 			}
+		case "port":
+			switch args[1] {
+			case "https":
+				p, err := strconv.Atoi(args[2])
+				if err != nil {
+					log.Error("Invalid port")
+				} else {
+					t.cfg.SetHttpsPort(p)
+				}
+				return nil
+			case "dns":
+				p, err := strconv.Atoi(args[2])
+				if err != nil {
+					log.Error("Invalid port")
+				} else {
+					t.cfg.SetDnsPort(p)
+				}
+				return nil
+			}
 		case "gophish":
 			switch args[1] {
 			case "admin_url":
@@ -1161,13 +1180,15 @@ func (t *Terminal) monitorLurePause() {
 func (t *Terminal) createHelp() {
 	h, _ := NewHelp()
 	h.AddCommand("config", "general", "manage general configuration", "Shows values of all configuration variables and allows to change them.", LAYER_TOP,
-		readline.PcItem("config", readline.PcItem("domain"), readline.PcItem("ipv4", readline.PcItem("external"), readline.PcItem("bind")), readline.PcItem("unauth_url"), readline.PcItem("autocert", readline.PcItem("on"), readline.PcItem("off")),
-			readline.PcItem("gophish", readline.PcItem("admin_url"), readline.PcItem("api_key"), readline.PcItem("insecure", readline.PcItem("true"), readline.PcItem("false")), readline.PcItem("test"))))
+		readline.PcItem("config", readline.PcItem("domain"), readline.PcItem("ipv4", readline.PcItem("external"), readline.PcItem("bind")), readline.PcItem("port", readline.PcItem("https"), readline.PcItem("dns")), readline.PcItem("unauth_url"), readline.PcItem("autocert", readline.PcItem("on"), readline.PcItem("off")),
+			readline.PcItem("gophish", readline.PcItem("admin_url"), readline.PcItem("api_key"), readline.PcItem("insecure", readline.PcItem("true"), readline.PcItem("false")), readline.PcItem("sessions", readline.PcItem("true"), readline.PcItem("false")), readline.PcItem("test"))))
 	h.AddSubCommand("config", nil, "", "show all configuration variables")
 	h.AddSubCommand("config", []string{"domain"}, "domain <domain>", "set base domain for all phishlets (e.g. evilsite.com)")
 	h.AddSubCommand("config", []string{"ipv4"}, "ipv4 <ipv4_address>", "set ipv4 external address of the current server")
 	h.AddSubCommand("config", []string{"ipv4", "external"}, "ipv4 external <ipv4_address>", "set ipv4 external address of the current server")
 	h.AddSubCommand("config", []string{"ipv4", "bind"}, "ipv4 bind <ipv4_address>", "set ipv4 bind address of the current server")
+	h.AddSubCommand("config", []string{"port", "https"}, "port https <port>", "set https port of the current server")
+	h.AddSubCommand("config", []string{"port", "dns"}, "port dns <port>", "set dns port of the current server")
 	h.AddSubCommand("config", []string{"unauth_url"}, "unauth_url <url>", "change the url where all unauthorized requests will be redirected to")
 	h.AddSubCommand("config", []string{"autocert"}, "autocert <on|off>", "enable or disable the automated certificate retrieval from letsencrypt")
 	h.AddSubCommand("config", []string{"gophish", "admin_url"}, "gophish admin_url <url>", "set up the admin url of a gophish instance to communicate with (e.g. https://gophish.domain.com:7777)")
