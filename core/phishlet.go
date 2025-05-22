@@ -499,7 +499,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Path == nil {
 				return fmt.Errorf("intercept: missing `path` field")
 			}
-			path_re, err := regexp.Compile(*ic.Path)
+			path_re, err := regexp.Compile(p.paramVal(*ic.Path))
 			if err != nil {
 				return fmt.Errorf("intercept: `path` invalid regular expression: %v", err)
 			}
