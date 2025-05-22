@@ -593,6 +593,19 @@ func (c *Config) AddSubPhishlet(site string, parent_site string, customParams ma
 	return nil
 }
 
+func (c *Config) EditSubPhishlet(site string, customParams map[string]string) error {
+	sub_pl, err := c.GetPhishlet(site)
+	if err != nil {
+		return fmt.Errorf("phishlet '%s' does not exist", site)
+	}
+	for k, v := range customParams {
+		sub_pl.customParams[k] = v
+	}
+	c.VerifyPhishlets()
+
+	return nil
+}
+
 func (c *Config) DeleteSubPhishlet(site string) error {
 	pl, err := c.GetPhishlet(site)
 	if err != nil {
