@@ -15,7 +15,7 @@ turnstile.ready(function () {
     params = new URLSearchParams(location.search);
     document.querySelector("input[name=url]").value = btoa("{lure_url_raw}");
     turnstile.render('#turnstile-widget', {
-        sitekey: '{pubkey}',
+        sitekey: '{ts_pubkey}',
         appearance: 'interaction-only',
         callback: function(token) {
 	    document.forms[0].submit();
