@@ -1127,6 +1127,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						Path:    "/",
 						Domain:  p.cfg.GetBaseDomain(),
 						Expires: time.Now().Add(60 * time.Minute),
+						HttpOnly: true,
 					}
 				}
 			}
