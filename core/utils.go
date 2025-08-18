@@ -10,7 +10,40 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"crypto/rc4"
+	"encoding/base64"
+	"net/url"
 )
+
+func EncryptUrlParams(base_url string, params map[string]string) string {
+	p := url.Values{}
+	var ret string = base_url
+
+	for k, v := range params {
+		p.Add(k, v)
+	}
+
+	if len(p) > 0 {
+		key_arg := strings.ToLower(GenRandomString(3))
+
+		enc_key := GenRandomAlphanumString(8)
+		dec_params := p.Encode()
+
+		var crc byte
+		for _, c := range dec_params {
+			crc += byte(c)
+		}
+
+		c, _ := rc4.NewCipher([]byte(enc_key))
+		enc_params := make([]byte, len(dec_params)+1)
+		c.XORKeyStream(enc_params[1:], []byte(dec_params))
+		enc_params[0] = crc
+
+		key_val := enc_key + base64.RawURLEncoding.EncodeToString([]byte(enc_params))
+		ret += "?" + key_arg + "=" + key_val
+	}
+	return ret
+}
 
 func GenRandomToken() string {
 	rdata := make([]byte, 64)
