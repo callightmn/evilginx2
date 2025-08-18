@@ -7,6 +7,7 @@ import (
 	"crypto/rc4"
 	"encoding/base64"
 	"net/url"
+	"html"
 
 	"github.com/kgretzky/evilginx2/database"
 )
@@ -145,6 +146,14 @@ func (s *Session) Finish(is_auth_url bool) {
 			s.DoneSignal = nil
 		}
 	}
+}
+
+func (s Session) ReplaceParams(body string, params *map[string]string) string {
+	for k, v := range *params {
+		key := "{" + k + "}"
+		body = strings.Replace(body, key, html.EscapeString(v), -1)
+	}
+	return body
 }
 
 func (s Session) EncryptParams(params map[string]string) string {
