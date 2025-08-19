@@ -982,13 +982,7 @@ func (p *Phishlet) GetScriptInject(hostname string, path string, params *map[str
 				}
 
 				if params_matched {
-					script := js.script
-					if params != nil {
-						for k, v := range *params {
-							script = strings.Replace(script, "{"+k+"}", v, -1)
-						}
-					}
-					return js.id, script, js.location, nil
+					return js.id, ReplaceParams(js.script, *params), js.location, nil
 				}
 			}
 		}
@@ -996,17 +990,10 @@ func (p *Phishlet) GetScriptInject(hostname string, path string, params *map[str
 	return "", "", "", fmt.Errorf("script not found")
 }
 
-func (p *Phishlet) GetScriptInjectById(id string, params *map[string]string) (string, error) {
+func (p *Phishlet) GetScriptInjectById(id string) (string, error) {
 	for _, js := range p.js_inject {
 		if js.id == id {
-			script := js.script
-			if params != nil {
-				for k, v := range *params {
-					script = strings.Replace(script, "{"+k+"}", v, -1)
-				}
-			}
-
-			return script, nil
+			return js.script, nil
 		}
 	}
 	return "", fmt.Errorf("script not found")
@@ -1247,9 +1234,7 @@ func (p *Phishlet) parseVersion(ver string) (PhishletVersion, error) {
 func (p *Phishlet) replaceTemplateVars(s string) string {
 	var ret string = s
 	if !p.isTemplate {
-		for k, v := range p.customParams {
-			ret = strings.ReplaceAll(ret, "{"+k+"}", v)
-		}
+		ret = ReplaceParams(ret, p.customParams)
 	}
 	return ret
 }

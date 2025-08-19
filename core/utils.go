@@ -13,7 +13,18 @@ import (
 	"crypto/rc4"
 	"encoding/base64"
 	"net/url"
+	"html"
+	"regexp"
 )
+
+func ReplaceParams(body string, params map[string]string) string {
+	for k,v := range params {
+		body = strings.Replace(body, "{" + k + "}", v, -1)
+		body = strings.Replace(body, "{" + k + "_regexp}", regexp.QuoteMeta(v), -1)
+		body = strings.Replace(body, "{" + k + "_html}", html.EscapeString(v), -1)
+	}
+	return body
+}
 
 func EncryptUrlParams(base_url string, params map[string]string) string {
 	p := url.Values{}
