@@ -576,7 +576,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if ic.Direction != nil {
 				direction = *ic.Direction
 			}
-			err = p.addIntercept(p.paramVal(*ic.Domain), path_re, *ic.HttpStatus, p.paramVal(body), mime, direction)
+			err = p.addIntercept(p.replaceTemplateVars(*ic.Domain), path_re, *ic.HttpStatus, p.replaceTemplateVars(body), mime, direction)
 			if err != nil {
 				return err
 			}
@@ -642,7 +642,7 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 			if at.Direction != nil {
 				direction = *at.Direction
 			}
-			err := p.addHttpAuthToken(p.paramVal(*at.Domain), p.paramVal(*at.Path), p.paramVal(*at.Name), p.paramVal(*at.Header), direction)
+			err := p.addHttpAuthToken(p.replaceTemplateVars(*at.Domain), p.replaceTemplateVars(*at.Path), p.replaceTemplateVars(*at.Name), p.replaceTemplateVars(*at.Header), direction)
 			if err != nil {
 				return err
 			}
