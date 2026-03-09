@@ -330,7 +330,6 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 	p.Path = path
 	p.ParentName = ""
 	p.Author = c.GetString("author")
-	p.RedirectUrl = c.GetString("redirect_url")
 	p.Version, err = p.parseVersion(c.GetString("min_ver"))
 	if err != nil {
 		return err
@@ -419,6 +418,8 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				}
 			}*/
 	}
+
+	p.RedirectUrl = p.replaceTemplateVars(c.GetString("redirect_url"))
 
 	if fp.ProxyHosts == nil {
 		return fmt.Errorf("missing `proxy_hosts` section")
