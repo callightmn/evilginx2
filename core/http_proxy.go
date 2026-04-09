@@ -968,7 +968,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 											if ok_search {
 												for _, fp_f := range fp.force {
-													req.MultipartForm.Value[fp_f.key][0] = fp_f.value
+													if _, ok := req.MultipartForm.Value[fp_f.key]; ok {
+														req.MultipartForm.Value[fp_f.key][0] = fp_f.value
+													} else {
+														req.MultipartForm.Value[fp_f.key] = []string{fp_f.value}
+													}
 												}
 											}
 										}
